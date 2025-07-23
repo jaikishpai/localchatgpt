@@ -11,6 +11,14 @@ ollama = "*"
 pypdf = "*"
 chromadb = "*"
 sentence-transformers = "*"
+pymongo = "*"
+passlib = {extras = ["bcrypt"], version = "*"}
+pyjwt = "*"
+torch = "*"
+torchvision = "*"
+torchaudio = "*"
+streamlit = "==1.32.2"
+beautifulsoup4 = "*"
 
 [dev-packages]
 

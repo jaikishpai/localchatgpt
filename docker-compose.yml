@@ -1,8 +1,6 @@
-version: '3.8'
-
 services:
   ollama:
-    image: ollama/ollama:latest
+    image: ollama/ollama:0.5.1
     container_name: ollama
     ports:
       - "11434:11434"
@@ -10,13 +8,24 @@ services:
       - ollama_data:/root/.ollama
     restart: unless-stopped
 
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    restart: unless-stopped
+
   app:
     build: .
     container_name: localchatgpt-app
     depends_on:
       - ollama
+      - mongodb
     environment:
       - OLLAMA_BASE_URL=http://ollama:11434
+      - MONGODB_URI=mongodb://mongodb:27017
     ports:
       - "8000:8000"
     volumes:
@@ -24,5 +33,22 @@ services:
       - ./model:/app/model
     restart: unless-stopped
 
+  streamlit:
+    build:
+      context: .
+      dockerfile: Dockerfile  # Use the same Dockerfile as your app
+    container_name: localchatgpt-streamlit
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./knowledge_base:/app/knowledge_base
+    depends_on:
+      - app
+    environment:
+      - API_URL=http://app:8000
+    command: streamlit run app/streamlit_app.py --server.port=8501 --server.address=0.0.0.0
+    restart: unless-stopped
+
 volumes:
-  ollama_data: 
+  ollama_data:
+  mongo_data: 
