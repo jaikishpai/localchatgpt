@@ -23,7 +23,12 @@ def chat_endpoint(request: ChatRequest, user=Depends(get_current_user)):
         return ChatResponse(response=cached_response, context=cached_context)
     # Semantic search for relevant context
     kb_results = semantic_search(request.message)
-    context = "\n---\n".join(f"From {fname}: {snippet}" for fname, snippet in kb_results) if kb_results else ""
+    context = ""
+    for fname, snippet in kb_results:
+        if fname.startswith("url_"):
+            context += f"From URL: {snippet}\n---\n"
+        else:
+            context += f"From {fname}: {snippet}\n---\n"
     response_text = get_ollama_response(request.message, context)
     # Cache the result
     cache_response(username, request.message, response_text, context)

@@ -73,30 +73,99 @@ def upload_pdf(file, jwt):
     else:
         st.error(f"Indexing failed: {resp.text}")
 
+# Sidebar navigation
 if st.session_state.jwt:
-    with st.expander("Upload PDF(s) to Knowledge Base"):
-        uploaded_files = st.file_uploader("Choose PDF(s)", type=["pdf"], accept_multiple_files=True)
-        if uploaded_files:
-            for file in uploaded_files:
-                upload_pdf(file, st.session_state.jwt)
+    page = "Chat"
+    if st.session_state.username == "admin":
+        page = st.sidebar.radio("Go to", ["Chat", "Admin Upload"])
+    else:
+        st.sidebar.write("You are not admin.")
 
-    st.subheader("Chat with your PDFs")
-    user_input = st.text_input("Your question", key="input")
-    if st.button("Send") and user_input:
-        headers = {"Authorization": f"Bearer {st.session_state.jwt}"}
-        resp = requests.post(f"{API_URL}/chat", json={"message": user_input}, headers=headers)
-        if resp.status_code == 200:
-            data = resp.json()
-            st.session_state.history.append(("You", user_input))
-            st.session_state.history.append(("Bot", data["response"]))
-        else:
-            st.error(f"Error: {resp.text}")
+    if page == "Chat":
+        # Only show upload section if admin
+        if st.session_state.username == "admin":
+            with st.expander("Upload PDF(s) to Knowledge Base"):
+                uploaded_files = st.file_uploader("Choose PDF(s)", type=["pdf"], accept_multiple_files=True)
+                if uploaded_files:
+                    for file in uploaded_files:
+                        kb_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../knowledge_base"))
+                        file_path = os.path.join(kb_dir, file.name)
+                        with open(file_path, "wb") as f:
+                            f.write(file.getbuffer())
+                        st.success(f"Uploaded {file.name} to knowledge_base/")
+                        headers = {"Authorization": f"Bearer {st.session_state.jwt}"}
+                        resp = requests.post(f"{API_URL}/index_pdfs", headers=headers)
+                        if resp.status_code == 200:
+                            st.success("PDFs re-indexed!")
+                        else:
+                            st.error(f"Indexing failed: {resp.text}")
+            with st.expander("Add Web Page as Knowledge"):
+                url = st.text_input("Enter URL", key="user_url")
+                if st.button("Add URL", key="user_add_url") and url:
+                    headers = {"Authorization": f"Bearer {st.session_state.jwt}"}
+                    resp = requests.post(f"{API_URL}/add_url", json={"url": url}, headers=headers)
+                    if resp.status_code == 200:
+                        st.success("URL added and indexed!")
+                    else:
+                        st.error(f"Failed to add URL: {resp.text}")
 
-    for speaker, text in st.session_state.history:
-        st.markdown(f"**{speaker}:** {text}")
+        st.subheader("Chat with your PDFs")
+        def send_message():
+            user_input = st.session_state["input"]
+            if user_input:
+                headers = {"Authorization": f"Bearer {st.session_state.jwt}"}
+                resp = requests.post(f"{API_URL}/chat", json={"message": user_input}, headers=headers)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    st.session_state.history.append(("You", user_input))
+                    st.session_state.history.append(("Bot", data["response"]))
+                    st.session_state["input"] = ""
+                else:
+                    st.error(f"Error: {resp.text}")
 
-    # Optionally, show context
-    if st.session_state.history and "context" in locals() and "context" in data:
-        st.markdown("---")
-        st.markdown("**Context used:**")
-        st.code(data["context"])
+        st.text_input("Your question", key="input")
+        st.button("Send", on_click=send_message)
+
+        for speaker, text in st.session_state.history:
+            st.markdown(f"**{speaker}:** {text}")
+
+        # Optionally, show context
+        if st.session_state.history and "context" in locals() and "context" in data:
+            st.markdown("---")
+            st.markdown("**Context used:**")
+            st.code(data["context"])
+
+    elif page == "Admin Upload":
+        st.header("Admin: Upload Knowledge")
+        st.write("Only admin can access this page.")
+
+        # PDF upload
+        with st.expander("Upload PDF(s) to Knowledge Base"):
+            uploaded_files = st.file_uploader("Choose PDF(s)", type=["pdf"], accept_multiple_files=True)
+            if uploaded_files:
+                for file in uploaded_files:
+                    # (reuse your upload_pdf function here)
+                    kb_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../knowledge_base"))
+                    file_path = os.path.join(kb_dir, file.name)
+                    with open(file_path, "wb") as f:
+                        f.write(file.getbuffer())
+                    st.success(f"Uploaded {file.name} to knowledge_base/")
+                    headers = {"Authorization": f"Bearer {st.session_state.jwt}"}
+                    resp = requests.post(f"{API_URL}/index_pdfs", headers=headers)
+                    if resp.status_code == 200:
+                        st.success("PDFs re-indexed!")
+                    else:
+                        st.error(f"Indexing failed: {resp.text}")
+
+        # URL upload
+        with st.expander("Add Web Page as Knowledge"):
+            url = st.text_input("Enter URL", key="admin_url")
+            if st.button("Add URL", key="admin_add_url") and url:
+                headers = {"Authorization": f"Bearer {st.session_state.jwt}"}
+                resp = requests.post(f"{API_URL}/add_url", json={"url": url}, headers=headers)
+                if resp.status_code == 200:
+                    st.success("URL added and indexed!")
+                else:
+                    st.error(f"Failed to add URL: {resp.text}")
+else:
+    st.sidebar.write("Please log in to access the app.")

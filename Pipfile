@@ -18,6 +18,7 @@ torch = "*"
 torchvision = "*"
 torchaudio = "*"
 streamlit = "==1.32.2"
+beautifulsoup4 = "*"
 
 [dev-packages]
 
